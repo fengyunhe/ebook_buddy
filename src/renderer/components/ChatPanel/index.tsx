@@ -1,19 +1,40 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useChatStore } from '../../stores/chatStore'
+import { useVoiceStore } from '../../stores/voiceStore'
 import { MarkdownRenderer } from '../MarkdownRenderer'
+import { VoiceSettingsDialog } from '../VoiceSettingsDialog'
 import {
   Box,
   Typography,
   TextField,
   Button,
   Paper,
-  CircularProgress
+  CircularProgress,
+  IconButton
 } from '@mui/material'
-import { Send as SendIcon } from '@mui/icons-material'
+import { Send as SendIcon, Settings as SettingsIcon } from '@mui/icons-material'
 
 export function ChatPanel() {
   const { messages, isLoading, addMessage } = useChatStore()
+  const { transcriptionResult, error, reset: resetVoice } = useVoiceStore()
   const [input, setInput] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  
+  useEffect(() => {
+    if (transcriptionResult?.success && transcriptionResult.text) {
+      setInput((prev) => prev + transcriptionResult.text)
+      inputRef.current?.focus()
+      resetVoice()
+    }
+  }, [transcriptionResult, resetVoice])
+  
+  useEffect(() => {
+    if (error) {
+      inputRef.current?.focus()
+      resetVoice()
+    }
+  }, [error, resetVoice])
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
@@ -47,13 +68,21 @@ export function ChatPanel() {
         sx={{
           p: 1.5,
           borderBottom: 1,
-          borderColor: 'divider'
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
         }}
       >
-        <Typography variant="h6" fontWeight={600}>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
           AI 助手
         </Typography>
+        <IconButton size="small" onClick={() => setSettingsOpen(true)} title="语音设置">
+          <SettingsIcon />
+        </IconButton>
       </Box>
+      
+      <VoiceSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       
       <Box
         sx={{
@@ -109,6 +138,7 @@ export function ChatPanel() {
         }}
       >
         <TextField
+          inputRef={inputRef}
           fullWidth
           multiline
           maxRows={4}

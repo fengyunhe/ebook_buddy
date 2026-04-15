@@ -12,14 +12,14 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Create voice recording types in src/shared/types/voice.ts
-- [ ] T002 Create transcription config types in src/shared/types/transcription.ts
+- [x] T001 Create voice recording types in src/shared/types/voice.ts
+- [x] T002 Create transcription config types in src/shared/types/transcription.ts
 
 ## Phase 2: Foundational
 
-- [ ] T003 [P] Implement voice recording state machine in src/renderer/stores/voiceStore.ts
-- [ ] T004 [P] Implement transcription config store in src/renderer/stores/configStore.ts
-- [ ] T005 Create error types for voice input errors in src/shared/types/errors.ts
+- [x] T003 [P] Implement voice recording state machine in src/renderer/stores/voiceStore.ts
+- [x] T004 [P] Implement transcription config store in src/renderer/stores/configStore.ts
+- [x] T005 Create error types for voice input errors in src/shared/types/errors.ts
 
 ## Phase 3: User Story 1 - Voice-to-Text via Alt Key (P1)
 
@@ -29,16 +29,16 @@
 
 **Implementation**:
 
-- [ ] T006 [US1] Create useVoiceRecorder hook in src/renderer/services/useVoiceRecorder.ts
-- [ ] T007 [US1] Implement MediaRecorder setup with getUserMedia in useVoiceRecorder hook
-- [ ] T008 [US1] Add global Alt key event listeners in useVoiceRecorder
-- [ ] T009 [US1] Implement minimum duration check (discard < 500ms) in useVoiceRecorder
-- [ ] T010 [US1] Add ignore new press while recording in progress logic
-- [ ] T011 [US1] Create transcription service in src/renderer/services/transcriptionService.ts
-- [ ] T012 [US1] Implement OpenAI-compatible API client with fetch in transcriptionService
-- [ ] T013 [US1] Add 15-second timeout handling in transcriptionService
-- [ ] T014 [US1] Create recording indicator component in src/renderer/components/VoiceRecordingIndicator.tsx
-- [ ] T015 [US1] Implement insert text into chat input and focus in ChatInput component
+- [x] T006 [US1] Create useVoiceRecorder hook in src/renderer/services/useVoiceRecorder.ts
+- [x] T007 [US1] Implement MediaRecorder setup with getUserMedia in useVoiceRecorder hook
+- [x] T008 [US1] Add global Alt key event listeners in useVoiceRecorder
+- [x] T009 [US1] Implement minimum duration check (discard < 500ms) in useVoiceRecorder
+- [x] T010 [US1] Add ignore new press while recording in progress logic
+- [x] T011 [US1] Create transcription service in src/renderer/services/transcriptionService.ts
+- [x] T012 [US1] Implement OpenAI-compatible API client with fetch in transcriptionService
+- [x] T013 [US1] Add 15-second timeout handling in transcriptionService
+- [x] T014 [US1] Create recording indicator component in src/renderer/components/VoiceRecordingIndicator.tsx
+- [x] T015 [US1] Implement insert text into chat input and focus in ChatInput component
 
 ## Phase 4: User Story 2 - Configurable Speech-to-Text Endpoint (P2)
 
@@ -48,9 +48,9 @@
 
 **Implementation**:
 
-- [ ] T016 [P] [US2] Add custom endpoint URL input in settings UI
-- [ ] T017 [US2] Implement URL validation for custom endpoints
-- [ ] T018 [US2] Add error notification for invalid endpoint configuration
+- [x] T016 [P] [US2] Add custom endpoint URL input in settings UI
+- [x] T017 [US2] Implement URL validation for custom endpoints
+- [x] T018 [US2] Add error notification for invalid endpoint configuration
 
 ## Phase 5: User Story 3 - Endpoint Presets (P3)
 
@@ -60,7 +60,7 @@
 
 **Implementation**:
 
-- [ ] T019 [P] [US3] Add preset selection UI with oMLX, Ollama, LmStudio options
+- [x] T019 [P] [US3] Add preset selection UI with oMLX, Ollama, LmStudio options
 
 ## Dependencies
 
