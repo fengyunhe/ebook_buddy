@@ -1,26 +1,60 @@
-# Project Constitution
+# Ebook Buddy Constitution
 
 ## Core Principles
 
-1. **Test-First Development** - All features must have tests before implementation
-2. **Specification-Driven** - All changes must be documented in SPEC.md before code
-3. **Incremental Delivery** - Small, frequent releases over large batches
-4. **Automated Verification** - CI/CD must pass before any merge
-5. **Documentation as Code** - Docs live next to the code they describe
+### I. Test-First Development
+All features must have tests before implementation. Tests define expected behavior; implementation fulfills it. Unit tests required for all new components and services; integration tests required for user workflows.
 
-## Decision Framework
+### II. Specification-Driven
+All changes must be documented in SPEC.md before code. Feature branches follow the workflow: spec → clarify → plan → tasks → implement → checklist.
 
-When facing technical choices:
-1. Does this align with our core principles?
-2. What's the smallest experiment to validate this?
-3. How will we verify this works?
-4. What could go wrong and how will we know?
+### III. Incremental Delivery
+Small, frequent releases over large batches. Each user story delivers independent value. MVP first: PDF viewing, then AI chat capability.
 
-## Review Checklist
+### IV. Automated Verification
+CI/CD must pass before any merge. `pnpm run typecheck` and `pnpm run test:run` must pass locally before push.
 
+### V. Documentation as Code
+Docs live next to the code they describe. Feature specs in `specs/[feature-branch]/`, tasks track implementation progress.
+
+## Additional Constraints
+
+### Technology Stack
+- **Frontend**: Electron 28 + React 18 + TypeScript 5.3
+- **State Management**: Zustand
+- **PDF Rendering**: PDF.js (pdfjs-dist)
+- **Markdown Rendering**: react-markdown + remark + rehype + katex
+- **Testing**: Vitest + Testing Library
+- **Build**: electron-vite (pnpm)
+
+### Desktop-Specific Requirements
+- Offline-capable core reading (PDF viewing works without network)
+- Local file access for PDF selection
+- Persistent reading position per book
+- Responsive UI to window resizing
+
+## Development Workflow
+
+### Feature Branch Lifecycle
+1. Create branch: `###-feature-name`
+2. Write SPEC.md with user stories
+3. Clarify requirements if needed
+4. Create plan.md with technical approach
+5. Generate tasks.md from user stories
+6. Implement: tests first → code → verify
+7. Checklist validation before PR
+
+### Quality Gates
 Before any PR:
 - [ ] Tests written first (TDD)
-- [ ] Specification updated
-- [ ] Code follows conventions
-- [ ] CI/CD passes
+- [ ] Feature spec updated
+- [ ] Code follows TypeScript conventions
+- [ ] `pnpm run typecheck` passes
+- [ ] `pnpm run test:run` passes
 - [ ] Documentation updated
+
+## Governance
+
+This constitution supersedes all other practices. Amendments require documented changes with version bump per semantic versioning rules: MAJOR for removals, MINOR for additions, PATCH for clarifications.
+
+**Version**: 1.0.0 | **Ratified**: 2026-04-15 | **Last Amended**: 2026-04-15
