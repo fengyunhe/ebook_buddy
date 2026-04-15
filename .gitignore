@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+dist/
+out/
+build/
+*.log
+.env*
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.tmp
+
+# Test coverage
+coverage/
+
+# Electron
+*.tsbuildinfo
+electron-builder.yml
