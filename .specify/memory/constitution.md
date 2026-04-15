@@ -17,6 +17,9 @@ CI/CD must pass before any merge. `pnpm run typecheck` and `pnpm run test:run` m
 ### V. Documentation as Code
 Docs live next to the code they describe. Feature specs in `specs/[feature-branch]/`, tasks track implementation progress.
 
+### VI. Conventional Commits
+All git commit messages must follow the Conventional Commits specification. Format: `<type>(<scope>): <description>` where type is one of: feat, fix, docs, style, refactor, test, chore, perf, ci, build. Use imperative mood in description.
+
 ## Additional Constraints
 
 ### Technology Stack
@@ -52,9 +55,10 @@ Before any PR:
 - [ ] `pnpm run typecheck` passes
 - [ ] `pnpm run test:run` passes
 - [ ] Documentation updated
+- [ ] Commit messages follow Conventional Commits
 
 ## Governance
 
 This constitution supersedes all other practices. Amendments require documented changes with version bump per semantic versioning rules: MAJOR for removals, MINOR for additions, PATCH for clarifications.
 
-**Version**: 1.0.0 | **Ratified**: 2026-04-15 | **Last Amended**: 2026-04-15
+**Version**: 1.1.0 | **Ratified**: 2026-04-15 | **Last Amended**: 2026-04-15

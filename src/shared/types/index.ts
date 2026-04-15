@@ -1,3 +1,7 @@
+export * from './voice'
+export * from './transcription'
+export * from './errors'
+
 export interface PDFDocument {
   filePath: string
   fileName: string
