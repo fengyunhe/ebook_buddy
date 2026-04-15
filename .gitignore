@@ -20,3 +20,8 @@ coverage/
 # Electron
 *.tsbuildinfo
 electron-builder.yml
+
+# Specify - but keep memory tracked
+.specify/scripts/
+.specify/templates/
+.specify/extensions/
