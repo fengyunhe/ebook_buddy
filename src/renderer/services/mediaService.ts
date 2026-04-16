@@ -64,7 +64,7 @@ export async function captureScreen(): Promise<ScreenCaptureResult> {
 export async function selectImageFile(): Promise<ImageFileResult> {
   try {
     const result = await (window as any).electronAPI?.openFileDialog?.({
-      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'tiff', 'tif'] }],
       properties: ['openFile']
     })
 
@@ -127,7 +127,11 @@ function getMimeType(fileName: string): string {
     jpg: 'image/jpeg',
     jpeg: 'image/jpeg',
     gif: 'image/gif',
-    webp: 'image/webp'
+    webp: 'image/webp',
+    bmp: 'image/bmp',
+    ico: 'image/x-icon',
+    tiff: 'image/tiff',
+    tif: 'image/tiff'
   }
   return mimeTypes[ext || ''] || 'image/png'
 }

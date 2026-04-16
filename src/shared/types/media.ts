@@ -21,7 +21,10 @@ export interface ImageFileResult {
 
 export const MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
-export const SUPPORTED_IMAGE_FORMATS = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
+export const SUPPORTED_IMAGE_FORMATS = [
+  'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp',
+  'image/bmp', 'image/x-icon', 'image/tiff'
+]
 
 export function isImageSizeValid(size: number): boolean {
   return size <= MAX_IMAGE_SIZE
