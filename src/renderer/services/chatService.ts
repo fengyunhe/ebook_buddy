@@ -17,11 +17,16 @@ export async function sendChatMessage(
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), config.timeout)
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    if (config.apiKey) {
+      headers['Authorization'] = `Bearer ${config.apiKey}`
+    }
+
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify({
         model: config.model,
         messages,
@@ -104,11 +109,16 @@ export async function sendChatMessageWithImage(
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), config.timeout)
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    if (config.apiKey) {
+      headers['Authorization'] = `Bearer ${config.apiKey}`
+    }
+
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify({
         model: config.model,
         messages: messages.map(m => ({

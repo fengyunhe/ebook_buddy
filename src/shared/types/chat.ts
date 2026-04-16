@@ -43,10 +43,11 @@ export interface ChatConfig {
   timeout: number
   temperature: number
   maxTokens: number
+  apiKey?: string
 }
 
 export const DEFAULT_CHAT_CONFIG: ChatConfig = {
-  baseUrl: 'http://localhost:11434',
+  baseUrl: 'http://localhost:11434/v1',
   model: 'gpt-4-vision-preview',
   timeout: 30000,
   temperature: 0.7,
@@ -54,5 +55,5 @@ export const DEFAULT_CHAT_CONFIG: ChatConfig = {
 }
 
 export function getChatEndpoint(baseUrl: string): string {
-  return `${baseUrl}/v1/chat/completions`
+  return `${baseUrl}/chat/completions`
 }

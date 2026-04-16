@@ -9,6 +9,11 @@ export async function transcribeAudio(
   try {
     const endpoint = getTranscriptionEndpoint(config.preset, config.baseUrl)
     
+    console.log('[Transcription] Audio blob size:', audioBlob.size)
+    console.log('[Transcription] Audio blob type:', audioBlob.type)
+    console.log('[Transcription] Model:', config.model)
+    console.log('[Transcription] Endpoint:', endpoint)
+    
     const formData = new FormData()
     formData.append('file', audioBlob, 'recording.webm')
     formData.append('model', config.model)
@@ -16,10 +21,16 @@ export async function transcribeAudio(
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), config.timeout)
 
+    const headers: HeadersInit = {}
+    if (config.apiKey) {
+      headers['Authorization'] = `Bearer ${config.apiKey}`
+    }
+
     const response = await fetch(endpoint, {
       method: 'POST',
       body: formData,
-      signal: controller.signal
+      signal: controller.signal,
+      headers
     })
 
     clearTimeout(timeoutId)

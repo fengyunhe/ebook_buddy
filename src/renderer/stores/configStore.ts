@@ -8,6 +8,10 @@ interface ConfigState extends TranscriptionConfig {
   setBaseUrl: (url: string) => void
   setTimeout: (timeout: number) => void
   setModel: (model: string) => void
+  setApiKey: (apiKey: string) => void
+  clearApiKey: () => void
+  chatModel: string
+  setChatModel: (model: string) => void
 }
 
 export const useConfigStore = create<ConfigState>()(
@@ -32,6 +36,19 @@ export const useConfigStore = create<ConfigState>()(
 
       setModel: (model: string) => {
         set({ model })
+      },
+
+      setApiKey: (apiKey: string) => {
+        set({ apiKey })
+      },
+
+      clearApiKey: () => {
+        set({ apiKey: undefined })
+      },
+
+      chatModel: 'llama3',
+      setChatModel: (chatModel: string) => {
+        set({ chatModel })
       }
     }),
     {

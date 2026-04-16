@@ -55,6 +55,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     const state = get()
     if (!state.recording) return
     
+    console.log('[VoiceStore] stopRecording called, audioBlob size:', audioBlob.size)
     const duration = Date.now() - state.recording.timestamp
     
     set({
