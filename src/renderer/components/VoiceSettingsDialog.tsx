@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogTitle,
@@ -42,10 +42,18 @@ function TabPanel(props: TabPanelProps) {
 
 export function VoiceSettingsDialog({ open, onClose }: VoiceSettingsDialogProps) {
   const [tabValue, setTabValue] = useState(0)
-  const { preset, baseUrl, timeout, model, setPreset, setBaseUrl, setTimeout, setModel } = useConfigStore()
+  const { preset, baseUrl, timeout, model, apiKey, chatModel, setPreset, setBaseUrl, setTimeout, setModel, setApiKey, clearApiKey, setChatModel } = useConfigStore()
   const [localBaseUrl, setLocalBaseUrl] = useState(baseUrl)
   const [localChatBaseUrl, setLocalChatBaseUrl] = useState(baseUrl)
-  const [chatModel, setChatModel] = useState('llama3')
+  const [localApiKey, setLocalApiKey] = useState(apiKey || '')
+  
+  useEffect(() => {
+    if (open) {
+      setLocalBaseUrl(baseUrl)
+      setLocalChatBaseUrl(baseUrl)
+      setLocalApiKey(apiKey || '')
+    }
+  }, [open, baseUrl, apiKey])
   
   const presets: { value: EndpointPreset; label: string; defaultUrl: string }[] = [
     { value: 'ollama', label: 'Ollama', defaultUrl: getEndpointUrl('ollama') },
@@ -70,6 +78,19 @@ export function VoiceSettingsDialog({ open, onClose }: VoiceSettingsDialogProps)
 
   const handleChatBaseUrlChange = (url: string) => {
     setLocalChatBaseUrl(url)
+  }
+
+  const handleSave = () => {
+    if (localApiKey) {
+      setApiKey(localApiKey)
+    }
+    if (localChatBaseUrl) {
+      setBaseUrl(localChatBaseUrl)
+    }
+    if (chatModel) {
+      setChatModel(chatModel)
+    }
+    onClose()
   }
   
   return (
@@ -103,8 +124,18 @@ export function VoiceSettingsDialog({ open, onClose }: VoiceSettingsDialogProps)
               value={localBaseUrl}
               onChange={(e) => handleBaseUrlChange(e.target.value)}
               fullWidth
-              placeholder="http://localhost:11434"
-              helperText="OpenAI 兼容接口的 base URL"
+              placeholder="http://localhost:11434/v1"
+              helperText="OpenAI 兼容接口的 base URL，需包含 /v1"
+            />
+
+            <TextField
+              label="API 密钥"
+              type="password"
+              value={localApiKey}
+              onChange={(e) => setLocalApiKey(e.target.value)}
+              fullWidth
+              placeholder="输入 API 密钥（可选）"
+              helperText="用于需要认证的服务，留空则不添加认证"
             />
 
             <TextField
@@ -130,7 +161,7 @@ export function VoiceSettingsDialog({ open, onClose }: VoiceSettingsDialogProps)
               <Typography variant="body2">
                 <strong>提示:</strong> 使用语音输入前，请确保本地 AI 服务正在运行。
                 <br />
-                默认端口: Ollama (11434)、LM Studio (1234)、oMLX (8080)
+                默认端口: Ollama (11434)、LM Studio (1234)、oMLX (8000)
               </Typography>
             </Alert>
           </Box>
@@ -158,8 +189,18 @@ export function VoiceSettingsDialog({ open, onClose }: VoiceSettingsDialogProps)
               value={localChatBaseUrl}
               onChange={(e) => handleChatBaseUrlChange(e.target.value)}
               fullWidth
-              placeholder="http://localhost:11434"
-              helperText="OpenAI 兼容接口的 base URL"
+              placeholder="http://localhost:11434/v1"
+              helperText="OpenAI 兼容接口的 base URL，需包含 /v1"
+            />
+
+            <TextField
+              label="API 密钥"
+              type="password"
+              value={localApiKey}
+              onChange={(e) => setLocalApiKey(e.target.value)}
+              fullWidth
+              placeholder="输入 API 密钥（可选）"
+              helperText="用于需要认证的服务，留空则不添加认证"
             />
 
             <TextField
@@ -175,7 +216,7 @@ export function VoiceSettingsDialog({ open, onClose }: VoiceSettingsDialogProps)
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>取消</Button>
-        <Button onClick={onClose} variant="contained">
+        <Button onClick={handleSave} variant="contained">
           保存
         </Button>
       </DialogActions>

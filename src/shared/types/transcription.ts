@@ -5,6 +5,7 @@ export interface TranscriptionConfig {
   baseUrl: string
   timeout: number
   model: string
+  apiKey?: string
 }
 
 export interface TranscriptionResult {
@@ -14,9 +15,9 @@ export interface TranscriptionResult {
 }
 
 export const DEFAULT_ENDPOINT_PRESETS: Record<Exclude<EndpointPreset, 'custom'>, string> = {
-  omlx: 'http://localhost:8080',
-  ollama: 'http://localhost:11434',
-  lmstudio: 'http://localhost:1234'
+  omlx: 'http://localhost:8000/v1',
+  ollama: 'http://localhost:11434/v1',
+  lmstudio: 'http://localhost:1234/v1'
 }
 
 export const DEFAULT_TRANSCRIPTION_CONFIG: TranscriptionConfig = {
@@ -27,5 +28,5 @@ export const DEFAULT_TRANSCRIPTION_CONFIG: TranscriptionConfig = {
 }
 
 export function getTranscriptionEndpoint(preset: EndpointPreset, baseUrl: string): string {
-  return `${baseUrl}/v1/audio/transcriptions`
+  return `${baseUrl}/audio/transcriptions`
 }

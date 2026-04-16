@@ -6,6 +6,7 @@ export type VoiceInputErrorType =
   | 'TRANSCRIPTION_FAILED'
   | 'INVALID_ENDPOINT'
   | 'NETWORK_ERROR'
+  | 'NO_AUDIO_DATA'
 
 export interface VoiceInputError {
   type: VoiceInputErrorType
@@ -40,6 +41,8 @@ export function getErrorMessage(error: VoiceInputError): string {
       return 'Invalid endpoint URL. Please check your settings.'
     case 'NETWORK_ERROR':
       return 'Network error. Please check your connection and endpoint.'
+    case 'NO_AUDIO_DATA':
+      return 'No audio data recorded. Please try again.'
     default:
       return error.message
   }

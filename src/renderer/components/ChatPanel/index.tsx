@@ -23,7 +23,7 @@ import { Send as SendIcon, Settings as SettingsIcon, Image as ImageIcon, Close a
 export function ChatPanel() {
   const { messages, isLoading, addMessage, setLoading } = useChatStore()
   const { transcriptionResult, error, reset: resetVoice } = useVoiceStore()
-  const { baseUrl, model, timeout } = useConfigStore()
+  const { baseUrl, model, timeout, apiKey, chatModel } = useConfigStore()
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<MediaAttachment[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
@@ -79,13 +79,13 @@ export function ChatPanel() {
         result = await sendChatMessageWithImage(
           userMessage,
           imageBase64,
-          { baseUrl, model, timeout, temperature: 0.7, maxTokens: 2048 },
+          { baseUrl, model: chatModel, timeout, temperature: 0.7, maxTokens: 2048, apiKey },
           history
         )
       } else {
         result = await sendChatMessage(
           userMessage,
-          { baseUrl, model, timeout, temperature: 0.7, maxTokens: 2048 },
+          { baseUrl, model: chatModel, timeout, temperature: 0.7, maxTokens: 2048, apiKey },
           history
         )
       }
@@ -179,27 +179,45 @@ export function ChatPanel() {
             </Typography>
           </Box>
         ) : (
-          messages.map((msg) => (
-            <Paper
-              key={msg.id}
-              elevation={0}
-              sx={{
-                p: 1.25,
-                maxWidth: '85%',
-                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                bgcolor: msg.role === 'user' ? 'primary.light' : 'grey.100',
-                borderRadius: 2
-              }}
-            >
-              <Box sx={{ fontSize: 14, lineHeight: 1.5, wordWrap: 'break-word' }}>
-                {msg.contentType === 'markdown' ? (
-                  <MarkdownRenderer content={msg.content} />
-                ) : (
-                  msg.content
-                )}
-              </Box>
-            </Paper>
-          ))
+          <>
+            {messages.map((msg) => (
+              <Paper
+                key={msg.id}
+                elevation={0}
+                sx={{
+                  p: 1.25,
+                  maxWidth: '85%',
+                  alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                  bgcolor: msg.role === 'user' ? 'primary.light' : 'grey.100',
+                  borderRadius: 2
+                }}
+              >
+                <Box sx={{ fontSize: 14, lineHeight: 1.5, wordWrap: 'break-word' }}>
+                  {msg.contentType === 'markdown' ? (
+                    <MarkdownRenderer content={msg.content} />
+                  ) : (
+                    msg.content
+                  )}
+                </Box>
+              </Paper>
+            ))}
+            {isLoading && (
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.25,
+                  maxWidth: '85%',
+                  alignSelf: 'flex-start',
+                  bgcolor: 'grey.100',
+                  borderRadius: 2
+                }}
+              >
+                <Box sx={{ fontSize: 14, color: 'text.secondary', fontStyle: 'italic' }}>
+                  正在思考...
+                </Box>
+              </Paper>
+            )}
+          </>
         )}
       </Box>
 
