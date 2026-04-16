@@ -41,10 +41,10 @@ app.on('window-all-closed', () => {
   app.quit()
 })
 
-ipcMain.handle('dialog:openFile', async () => {
+ipcMain.handle('dialog:openFile', async (_event, options?: { filters?: { name: string; extensions: string[] }[]; properties?: Array<'openFile' | 'openDirectory' | 'multiSelections'> }) => {
   const result = await dialog.showOpenDialog({
-    properties: ['openFile'],
-    filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    properties: options?.properties || ['openFile'],
+    filters: options?.filters || [{ name: 'All Files', extensions: ['*'] }]
   })
   return result
 })
