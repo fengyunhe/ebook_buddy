@@ -83,7 +83,7 @@ export async function sendChatMessage(
 
 export async function sendChatMessageWithImage(
   content: string,
-  imageBase64: string,
+  imageBase64: string | string[],
   config: ChatConfig = DEFAULT_CHAT_CONFIG,
   history: ChatMessage[] = []
 ): Promise<ChatResult> {
@@ -97,6 +97,25 @@ export async function sendChatMessageWithImage(
       headers['Authorization'] = `Bearer ${config.apiKey}`
     }
 
+    const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64]
+    
+    const messageContent: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [
+      { type: 'text', text: content || 'Please analyze these images' }
+    ]
+    
+    for (const img of images) {
+      let mimeType = 'image/png'
+      if (img.startsWith('/9j/')) mimeType = 'image/jpeg'
+      else if (img.startsWith('iVBOR')) mimeType = 'image/png'
+      else if (img.startsWith('R0lGO')) mimeType = 'image/gif'
+      else if (img.startsWith('UklGR')) mimeType = 'image/webp'
+      
+      messageContent.push({
+        type: 'image_url',
+        image_url: { url: `data:${mimeType};base64,${img}` }
+      })
+    }
+
     const response = await apiFetch({
       url: endpoint,
       method: 'POST',
@@ -107,10 +126,7 @@ export async function sendChatMessageWithImage(
           ...history,
           {
             role: 'user',
-            content: [
-              { type: 'text', text: content },
-              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
-            ]
+            content: messageContent
           }
         ],
         temperature: config.temperature,

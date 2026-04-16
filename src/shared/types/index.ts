@@ -3,6 +3,7 @@ export * from './transcription'
 export * from './errors'
 export * from './chat'
 export * from './media'
+export * from './pageImage'
 
 export interface PDFDocument {
   filePath: string
@@ -48,6 +49,12 @@ export interface ElectronAPI {
   getDesktopSources: () => Promise<{ id: string; name: string; thumbnail: string }[]>
   captureRegion: (sourceId: string, region: { x: number; y: number; width: number; height: number }) => Promise<{ success: boolean; data?: string; mimeType?: string; error?: string }>
   apiFetch: (options: { url: string; method: string; headers?: Record<string, string>; body?: string }) => Promise<{ ok: boolean; status: number; data: string }>
+  showContextMenu: () => Promise<void>
+  capturePage: (pageNumber: number) => Promise<{ success: boolean; pageNumber: number }>
+  onPageCaptureTrigger: (callback: () => void) => () => void
+  onPageCaptureMultiple: (callback: (count: number) => void) => () => void
+  onGetMaxPages: (callback: () => void) => () => void
+  sendMaxPages: (count: number) => void
 }
 
 declare global {

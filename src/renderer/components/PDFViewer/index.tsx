@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import {
   Box,
@@ -7,7 +7,9 @@ import {
   Typography,
   CircularProgress,
   TextField,
-  Divider
+  Divider,
+  Snackbar,
+  Alert
 } from '@mui/material'
 import {
   FileOpen as FileOpenIcon,
@@ -16,6 +18,7 @@ import {
   ZoomIn as ZoomInIcon,
   ZoomOut as ZoomOutIcon
 } from '@mui/icons-material'
+import { useConversationImageStore } from '../../stores/conversationImageStore'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -51,6 +54,121 @@ export function PDFViewer({ onPageChange }: PDFViewerProps) {
   const renderTaskRef = useRef<any>(null)
   const scaleRef = useRef(scale)
   const currentPageRef = useRef(currentPage)
+  const filePathRef = useRef(currentFilePath)
+  const [notification, setNotification] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'info' })
+  
+  const addImage = useConversationImageStore((state) => state.addImage)
+  
+  useEffect(() => {
+    filePathRef.current = currentFilePath
+  }, [currentFilePath])
+  
+  const handleCaptureCurrentPage = useCallback(async () => {
+    if (!pdfDoc || !currentPage || !filePathRef.current) {
+      setNotification({ open: true, message: 'Please open a PDF first', severity: 'error' })
+      return
+    }
+    
+    try {
+      const page = await pdfDoc.getPage(currentPage)
+      const viewport = page.getViewport({ scale: 1.5 })
+      
+      const canvas = document.createElement('canvas')
+      canvas.width = viewport.width
+      canvas.height = viewport.height
+      
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        throw new Error('Failed to get canvas context')
+      }
+      
+      await page.render({
+        canvasContext: ctx,
+        viewport
+      }).promise
+      
+      const imageData = canvas.toDataURL('image/png')
+      page.cleanup()
+      
+      const result = addImage(currentPage, imageData, filePathRef.current)
+      
+      if (result.success) {
+        setNotification({ open: true, message: `Page ${currentPage} added to chat`, severity: 'success' })
+      } else {
+        setNotification({ open: true, message: result.message || 'Failed to add page', severity: 'error' })
+      }
+    } catch (err) {
+      console.error('Failed to capture page:', err)
+      setNotification({ open: true, message: 'Failed to capture page', severity: 'error' })
+    }
+  }, [pdfDoc, currentPage, addImage])
+  
+  const handleCaptureMultiplePages = useCallback(async (count: number) => {
+    if (!pdfDoc || !currentPage || !filePathRef.current) {
+      setNotification({ open: true, message: 'Please open a PDF first', severity: 'error' })
+      return
+    }
+    
+    const store = useConversationImageStore.getState()
+    const remainingSlots = 10 - store.images.length
+    const pagesToCapture = Math.min(count || remainingSlots, remainingSlots, totalPages - currentPage + 1)
+    
+    let addedCount = 0
+    for (let i = 0; i < pagesToCapture && useConversationImageStore.getState().images.length < 10; i++) {
+      const pageNum = currentPage + i
+      try {
+        const page = await pdfDoc.getPage(pageNum)
+        const viewport = page.getViewport({ scale: 1.5 })
+        
+        const canvas = document.createElement('canvas')
+        canvas.width = viewport.width
+        canvas.height = viewport.height
+        
+        const ctx = canvas.getContext('2d')
+        if (!ctx) continue
+        
+        await page.render({ canvasContext: ctx, viewport }).promise
+        const imageData = canvas.toDataURL('image/png')
+        page.cleanup()
+        
+        const result = addImage(pageNum, imageData, filePathRef.current)
+        if (result.success) addedCount++
+      } catch (err) {
+        console.error(`Failed to capture page ${pageNum}:`, err)
+      }
+    }
+    
+    if (addedCount > 0) {
+      setNotification({ open: true, message: `Added ${addedCount} pages to chat`, severity: 'success' })
+    } else {
+      setNotification({ open: true, message: 'Failed to add pages', severity: 'error' })
+    }
+  }, [pdfDoc, currentPage, totalPages, addImage])
+  
+  useEffect(() => {
+    if (window.electronAPI?.onPageCaptureTrigger) {
+      const unsubscribe = window.electronAPI.onPageCaptureTrigger(handleCaptureCurrentPage)
+      return unsubscribe
+    }
+  }, [handleCaptureCurrentPage])
+  
+  useEffect(() => {
+    if (window.electronAPI?.onPageCaptureMultiple) {
+      const unsubscribe = window.electronAPI.onPageCaptureMultiple((count: number) => handleCaptureMultiplePages(count))
+      return unsubscribe
+    }
+  }, [handleCaptureMultiplePages])
+  
+  useEffect(() => {
+    if (window.electronAPI?.onGetMaxPages) {
+      const unsubscribe = window.electronAPI.onGetMaxPages(() => {
+        const remaining = useConversationImageStore.getState().maxLimit - useConversationImageStore.getState().images.length
+        const available = Math.min(remaining, totalPages - currentPage + 1)
+        window.electronAPI?.sendMaxPages(available)
+      })
+      return unsubscribe
+    }
+  }, [totalPages, currentPage])
 
   useEffect(() => {
     scaleRef.current = scale
@@ -76,6 +194,21 @@ export function PDFViewer({ onPageChange }: PDFViewerProps) {
     }
     return () => observer.disconnect()
   }, [pdfDoc])
+
+  useEffect(() => {
+    const handleContextMenu = async (e: MouseEvent) => {
+      e.preventDefault()
+      if (window.electronAPI?.showContextMenu) {
+        await window.electronAPI.showContextMenu()
+      }
+    }
+
+    const container = containerRef.current
+    if (container) {
+      container.addEventListener('contextmenu', handleContextMenu)
+      return () => container.removeEventListener('contextmenu', handleContextMenu)
+    }
+  }, [pdfDoc, currentPage])
 
   const saveState = (filePath: string, page: number, scaleValue: number) => {
     const state: PDFState = { filePath, page, scale: scaleValue }
@@ -409,6 +542,17 @@ const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         >
           <canvas ref={canvasRef} style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} />
         </Box>
+        
+        <Snackbar
+          open={notification.open}
+          autoHideDuration={3000}
+          onClose={() => setNotification((prev) => ({ ...prev, open: false }))}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert severity={notification.severity} onClose={() => setNotification((prev) => ({ ...prev, open: false }))}>
+            {notification.message}
+          </Alert>
+        </Snackbar>
       </Box>
     </Box>
   )

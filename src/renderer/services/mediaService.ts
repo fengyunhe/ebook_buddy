@@ -114,62 +114,105 @@ export async function captureScreen(): Promise<ScreenCaptureResult> {
 }
 
 export async function selectImageFile(): Promise<ImageFileResult> {
-  try {
-    let fileData: ArrayBuffer | null = null
-    let fileName = 'image'
+  return selectMultipleImageFiles(1)
+}
 
+export async function selectMultipleImageFiles(maxCount?: number): Promise<ImageFileResult> {
+  try {
     if (electronAPI?.openFileDialog) {
       const result = await electronAPI.openFileDialog({
         filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'tiff', 'tif'] }],
-        properties: ['openFile']
+        properties: ['openFile', 'multiSelections']
       })
 
-      if (result?.canceled || !result?.filePaths?.[0]) {
+      if (result?.canceled || !result?.filePaths?.length) {
         return { success: false, error: 'No file selected' }
       }
 
-      const filePath = result.filePaths[0]
-      fileData = await electronAPI.readFile(filePath)
-      fileName = filePath.split(/[\\/]/).pop() || 'image'
+      const filePaths = maxCount ? result.filePaths.slice(0, maxCount) : result.filePaths
+      const attachments: MediaAttachment[] = []
+
+      for (const filePath of filePaths) {
+        try {
+          const fileData = await electronAPI.readFile(filePath)
+          const fileName = filePath.split(/[\\/]/).pop() || 'image'
+          const blob = new Blob([fileData])
+          const size = blob.size
+
+          if (!isImageSizeValid(size)) {
+            continue
+          }
+
+          const base64 = await blobToBase64(blob)
+          attachments.push({
+            id: crypto.randomUUID(),
+            type: 'image',
+            data: base64,
+            mimeType: getMimeType(fileName),
+            size,
+            name: fileName
+          })
+        } catch (err) {
+          console.error(`Failed to read file ${filePath}:`, err)
+        }
+      }
+
+      if (attachments.length === 0) {
+        return { success: false, error: 'No valid images selected' }
+      }
+
+      return {
+        success: true,
+        data: attachments.length === 1 ? attachments[0] : attachments
+      }
     } else {
       const input = createInputElement('image/*')
-      const file: File | null = await new Promise((resolve) => {
-        input.onchange = () => resolve(input.files?.[0] || null)
-        input.oncancel = () => resolve(null)
+      input.multiple = true
+      const files: File[] = await new Promise((resolve) => {
+        input.onchange = () => resolve(Array.from(input.files || []))
+        input.oncancel = () => resolve([])
         input.click()
       })
       document.body.removeChild(input)
 
-      if (!file) {
+      if (!files.length) {
         return { success: false, error: 'No file selected' }
       }
 
-      fileData = await file.arrayBuffer()
-      fileName = file.name
-    }
-    
-    if (!fileData) {
-      return { success: false, error: 'Failed to read file' }
-    }
+      const selectedFiles = maxCount ? files.slice(0, maxCount) : files
+      const attachments: MediaAttachment[] = []
 
-    const blob = new Blob([fileData])
-    const size = blob.size
+      for (const file of selectedFiles) {
+        try {
+          const fileData = await file.arrayBuffer()
+          const blob = new Blob([fileData])
+          const size = blob.size
 
-    if (!isImageSizeValid(size)) {
-      return { success: false, error: `Image too large. Maximum size is ${MAX_IMAGE_SIZE / 1024 / 1024}MB` }
-    }
+          if (!isImageSizeValid(size)) {
+            continue
+          }
 
-    const base64 = await blobToBase64(blob)
+          const base64 = await blobToBase64(blob)
+          attachments.push({
+            id: crypto.randomUUID(),
+            type: 'image',
+            data: base64,
+            mimeType: file.type || getMimeType(file.name),
+            size,
+            name: file.name
+          })
+        } catch (err) {
+          console.error(`Failed to read file ${file.name}:`, err)
+        }
+      }
 
-    return {
-      success: true,
-      data: {
-        id: crypto.randomUUID(),
-        type: 'image',
-        data: base64,
-        mimeType: getMimeType(fileName),
-        size,
-        name: fileName
+      if (attachments.length === 0) {
+        return { success: false, error: 'No valid images selected' }
+      }
+
+      return {
+        success: true,
+        data: attachments.length === 1 ? attachments[0] : attachments
       }
     }
   } catch (error) {

@@ -15,7 +15,7 @@ export interface ScreenCaptureResult {
 
 export interface ImageFileResult {
   success: boolean
-  data?: MediaAttachment
+  data?: MediaAttachment | MediaAttachment[]
   error?: string
 }
 
