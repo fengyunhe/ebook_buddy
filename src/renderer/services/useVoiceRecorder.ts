@@ -219,7 +219,7 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions = {}) {
   
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Alt' && !event.repeat) {
+      if (event.key === 'Alt' && !event.repeat && !event.ctrlKey && !event.metaKey) {
         event.preventDefault()
         startCapture()
       }
