@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, desktopCapturer } from 'electron'
 import { join } from 'path'
 import { readFile } from 'fs/promises'
 
@@ -52,4 +52,16 @@ ipcMain.handle('dialog:openFile', async (_event, options?: { filters?: { name: s
 ipcMain.handle('file:read', async (_event, filePath: string) => {
   const buffer = await readFile(filePath)
   return buffer.buffer
+})
+
+ipcMain.handle('desktop:getSources', async () => {
+  const sources = await desktopCapturer.getSources({
+    types: ['screen', 'window'],
+    thumbnailSize: { width: 320, height: 180 }
+  })
+  return sources.map(source => ({
+    id: source.id,
+    name: source.name,
+    thumbnail: source.thumbnail.toDataURL()
+  }))
 })

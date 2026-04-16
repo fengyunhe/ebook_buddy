@@ -12,7 +12,7 @@ export async function captureScreen(): Promise<ScreenCaptureResult> {
       }
     }
 
-    const primarySource = sources.find((s: any) => s.id.includes('screen')) || sources[0]
+    const primarySource = sources.find((s: any) => s.name.toLowerCase().includes('screen') || s.name.toLowerCase().includes('entire')) || sources[0]
     
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
