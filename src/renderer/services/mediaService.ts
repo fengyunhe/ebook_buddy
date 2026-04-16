@@ -147,3 +147,41 @@ export function validateImage(attachment: MediaAttachment): { valid: boolean; er
   
   return { valid: true }
 }
+
+export async function processClipboardImage(): Promise<ImageFileResult> {
+  try {
+    const items = await navigator.clipboard.read()
+    
+    for (const item of items) {
+      for (const type of item.types) {
+        if (type.startsWith('image/')) {
+          const blob = await item.getType(type)
+          const size = blob.size
+          
+          if (!isImageSizeValid(size)) {
+            return { success: false, error: `Image too large. Maximum size is ${MAX_IMAGE_SIZE / 1024 / 1024}MB` }
+          }
+          
+          const base64 = await blobToBase64(blob)
+          const ext = type.split('/')[1] || 'png'
+          const mimeType = `image/${ext}`
+          
+          return {
+            success: true,
+            data: {
+              id: crypto.randomUUID(),
+              type: 'image',
+              data: base64,
+              mimeType,
+              size
+            }
+          }
+        }
+      }
+    }
+    
+    return { success: false, error: 'No image in clipboard' }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to process clipboard' }
+  }
+}

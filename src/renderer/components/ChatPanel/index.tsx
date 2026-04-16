@@ -3,11 +3,10 @@ import { useChatStore } from '../../stores/chatStore'
 import { useVoiceStore } from '../../stores/voiceStore'
 import { useConfigStore } from '../../stores/configStore'
 import { sendChatMessage, sendChatMessageWithImage } from '../../services/chatService'
-import { selectImageFile } from '../../services/mediaService'
+import { selectImageFile, processClipboardImage } from '../../services/mediaService'
 import type { MediaAttachment } from '../../../shared/types/media'
 import { MarkdownRenderer } from '../MarkdownRenderer'
 import { VoiceSettingsDialog } from '../VoiceSettingsDialog'
-import { RegionSelector } from '../RegionSelector'
 import {
   Box,
   Typography,
@@ -19,7 +18,7 @@ import {
   ImageList,
   ImageListItem
 } from '@mui/material'
-import { Send as SendIcon, Settings as SettingsIcon, ScreenshotMonitor, Image as ImageIcon, Close as CloseIcon } from '@mui/icons-material'
+import { Send as SendIcon, Settings as SettingsIcon, Image as ImageIcon, Close as CloseIcon } from '@mui/icons-material'
 
 export function ChatPanel() {
   const { messages, isLoading, addMessage, setLoading } = useChatStore()
@@ -27,7 +26,6 @@ export function ChatPanel() {
   const { baseUrl, model, timeout } = useConfigStore()
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<MediaAttachment[]>([])
-  const [showRegionSelector, setShowRegionSelector] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   
@@ -45,6 +43,14 @@ export function ChatPanel() {
       resetVoice()
     }
   }, [error, resetVoice])
+
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const clipboardImage = await processClipboardImage()
+    if (clipboardImage.success && clipboardImage.data) {
+      e.preventDefault()
+      setAttachments(prev => [...prev, clipboardImage.data!])
+    }
+  }
 
   const handleSend = async () => {
     if ((!input.trim() && attachments.length === 0) || isLoading) return
@@ -118,28 +124,6 @@ export function ChatPanel() {
       e.preventDefault()
       handleSend()
     }
-  }
-
-  const handleCaptureScreen = () => {
-    setShowRegionSelector(true)
-  }
-
-  const handleRegionCapture = async (region: { x: number; y: number; width: number; height: number }) => {
-    try {
-      const result = await (window as any).electronAPI?.captureRegion?.('screen:0', region)
-      if (result?.success) {
-        setAttachments(prev => [...prev, {
-          id: crypto.randomUUID(),
-          type: 'image',
-          data: result.data,
-          mimeType: result.mimeType || 'image/png',
-          size: Math.ceil(result.data.length * 0.75)
-        }])
-      }
-    } catch (err) {
-      console.error('Failed to capture region:', err)
-    }
-    setShowRegionSelector(false)
   }
 
   const handleSelectImage = async () => {
@@ -236,19 +220,12 @@ export function ChatPanel() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="输入消息..."
+          onPaste={handlePaste}
+          placeholder="输入消息... (Ctrl+V粘贴图片)"
           disabled={isLoading}
           size="small"
         />
         <Box sx={{ display: 'flex', gap: 0.5 }}>
-          <IconButton 
-            size="small" 
-            onClick={handleCaptureScreen} 
-            disabled={isLoading}
-            title="截取屏幕区域"
-          >
-            <ScreenshotMonitor />
-          </IconButton>
           <IconButton 
             size="small" 
             onClick={handleSelectImage} 
@@ -296,12 +273,6 @@ export function ChatPanel() {
             ))}
           </ImageList>
         </Box>
-      )}
-      {showRegionSelector && (
-        <RegionSelector 
-          onCapture={handleRegionCapture} 
-          onClose={() => setShowRegionSelector(false)} 
-        />
       )}
     </Box>
   )
