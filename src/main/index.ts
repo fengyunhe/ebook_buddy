@@ -103,3 +103,44 @@ ipcMain.handle('api:fetch', async (_event, options: { url: string; method: strin
     return { ok: false, status: 0, data: error instanceof Error ? error.message : 'Request failed' }
   }
 })
+
+ipcMain.handle('context-menu:show', async (event) => {
+  const { Menu } = await import('electron')
+  const { createContextMenuTemplate } = await import('./menu/contextMenuTemplate')
+  
+  const win = BrowserWindow.fromWebContents(event.sender)
+  
+  const onCapture = () => {
+    if (win) {
+      win.webContents.send('page-capture:trigger')
+    }
+  }
+  
+  const onCaptureMultiple = (count: number) => {
+    if (win) {
+      win.webContents.send('page-capture:multiple', count)
+    }
+  }
+  
+  if (win) {
+    win.webContents.send('page-capture:get-max-pages')
+  }
+  
+  ipcMain.once('page-capture:max-pages-reply', (_event, maxPages: number) => {
+    const menu = Menu.buildFromTemplate(createContextMenuTemplate(onCapture, onCaptureMultiple, maxPages))
+    if (win) {
+      menu.popup({ window: win })
+    }
+  })
+})
+
+ipcMain.handle('capture:page', async (_event, pageNumber: number) => {
+  return { success: true, pageNumber }
+})
+
+ipcMain.on('page-capture:get-remaining', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win) {
+    win.webContents.send('page-capture:remaining-reply', 0)
+  }
+})
