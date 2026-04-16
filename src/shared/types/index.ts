@@ -43,8 +43,11 @@ export interface UserPreferences {
 }
 
 export interface ElectronAPI {
-  openFileDialog: () => Promise<{ canceled: boolean; filePaths: string[] }>
+  openFileDialog: (options?: { filters?: { name: string; extensions: string[] }[]; properties?: string[] }) => Promise<{ canceled: boolean; filePaths: string[] }>
   readFile: (filePath: string) => Promise<ArrayBuffer>
+  getDesktopSources: () => Promise<{ id: string; name: string; thumbnail: string }[]>
+  captureRegion: (sourceId: string, region: { x: number; y: number; width: number; height: number }) => Promise<{ success: boolean; data?: string; mimeType?: string; error?: string }>
+  apiFetch: (options: { url: string; method: string; headers?: Record<string, string>; body?: string }) => Promise<{ ok: boolean; status: number; data: string }>
 }
 
 declare global {

@@ -1,5 +1,22 @@
 import type { ChatConfig, ChatResult, ChatMessage } from '../../shared/types/chat'
 import { getChatEndpoint, DEFAULT_CHAT_CONFIG } from '../../shared/types/chat'
+import '../../shared/types'
+
+const electronAPI = (window as any).electronAPI
+
+async function apiFetch(options: { url: string; method: string; headers?: Record<string, string>; body?: string }) {
+  if (electronAPI?.apiFetch) {
+    return electronAPI.apiFetch(options)
+  }
+  // Browser: use regular fetch (for local dev server with CORS)
+  const response = await fetch(options.url, {
+    method: options.method,
+    headers: options.headers,
+    body: options.body
+  })
+  const data = await response.text()
+  return { ok: response.ok, status: response.status, data }
+}
 
 export async function sendChatMessage(
   content: string,
@@ -14,9 +31,6 @@ export async function sendChatMessage(
       { role: 'user', content }
     ]
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), config.timeout)
-
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     }
@@ -24,7 +38,8 @@ export async function sendChatMessage(
       headers['Authorization'] = `Bearer ${config.apiKey}`
     }
 
-    const response = await fetch(endpoint, {
+    const response = await apiFetch({
+      url: endpoint,
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -32,22 +47,18 @@ export async function sendChatMessage(
         messages,
         temperature: config.temperature,
         max_tokens: config.maxTokens
-      }),
-      signal: controller.signal
+      })
     })
 
-    clearTimeout(timeoutId)
-
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error')
       return {
         content: '',
         success: false,
-        error: `API error: ${response.status} - ${errorText}`
+        error: `API error: ${response.status} - ${response.data}`
       }
     }
 
-    const data = await response.json()
+    const data = JSON.parse(response.data)
     
     return {
       content: data.choices?.[0]?.message?.content || '',
@@ -56,13 +67,6 @@ export async function sendChatMessage(
     }
   } catch (error) {
     if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        return {
-          content: '',
-          success: false,
-          error: 'Request timed out'
-        }
-      }
       return {
         content: '',
         success: false,
@@ -85,29 +89,6 @@ export async function sendChatMessageWithImage(
 ): Promise<ChatResult> {
   try {
     const endpoint = getChatEndpoint(config.baseUrl)
-    
-    const messages: ChatMessage[] = [
-      ...history,
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: content
-          },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:image/jpeg;base64,${imageBase64}`
-            }
-          }
-        ] as unknown as string,
-        imageUrl: `data:image/jpeg;base64,${imageBase64}`
-      }
-    ]
-
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), config.timeout)
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
@@ -116,35 +97,36 @@ export async function sendChatMessageWithImage(
       headers['Authorization'] = `Bearer ${config.apiKey}`
     }
 
-    const response = await fetch(endpoint, {
+    const response = await apiFetch({
+      url: endpoint,
       method: 'POST',
       headers,
       body: JSON.stringify({
         model: config.model,
-        messages: messages.map(m => ({
-          role: m.role,
-          content: m.imageUrl 
-            ? [{ type: 'text', text: m.content }, { type: 'image_url', image_url: { url: m.imageUrl } }]
-            : m.content
-        })),
+        messages: [
+          ...history,
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: content },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
+            ]
+          }
+        ],
         temperature: config.temperature,
         max_tokens: config.maxTokens
-      }),
-      signal: controller.signal
+      })
     })
 
-    clearTimeout(timeoutId)
-
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error')
       return {
         content: '',
         success: false,
-        error: `API error: ${response.status} - ${errorText}`
+        error: `API error: ${response.status} - ${response.data}`
       }
     }
 
-    const data = await response.json()
+    const data = JSON.parse(response.data)
     
     return {
       content: data.choices?.[0]?.message?.content || '',
@@ -153,13 +135,6 @@ export async function sendChatMessageWithImage(
     }
   } catch (error) {
     if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        return {
-          content: '',
-          success: false,
-          error: 'Request timed out'
-        }
-      }
       return {
         content: '',
         success: false,

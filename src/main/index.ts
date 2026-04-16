@@ -88,3 +88,18 @@ ipcMain.handle('desktop:captureRegion', async (_event, sourceId: string, region:
     return { success: false, error: error instanceof Error ? error.message : 'Failed to capture region' }
   }
 })
+
+ipcMain.handle('api:fetch', async (_event, options: { url: string; method: string; headers?: Record<string, string>; body?: string }) => {
+  try {
+    const response = await fetch(options.url, {
+      method: options.method,
+      headers: options.headers,
+      body: options.body
+    })
+    
+    const data = await response.text()
+    return { ok: response.ok, status: response.status, data }
+  } catch (error) {
+    return { ok: false, status: 0, data: error instanceof Error ? error.message : 'Request failed' }
+  }
+})

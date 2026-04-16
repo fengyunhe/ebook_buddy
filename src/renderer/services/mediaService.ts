@@ -1,6 +1,58 @@
 import type { MediaAttachment, ScreenCaptureResult, ImageFileResult } from '../../shared/types/media'
 import { isImageSizeValid, isImageFormatValid, MAX_IMAGE_SIZE } from '../../shared/types/media'
 
+const electronAPI = (window as any).electronAPI
+
+function createInputElement(accept: string, multiple: boolean = false): HTMLInputElement {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = accept
+  input.multiple = multiple
+  input.style.display = 'none'
+  document.body.appendChild(input)
+  return input
+}
+
+function openFileDialog(options?: { filters?: { name: string; extensions: string[] }[]; properties?: string[] }): Promise<{ canceled: boolean; filePaths: string[] }> {
+  return new Promise((resolve) => {
+    const input = createInputElement(
+      options?.filters?.[0]?.extensions?.map(ext => '.' + ext).join(',') || '',
+      options?.properties?.includes('multiSelections')
+    )
+    input.onchange = async () => {
+      const files = input.files
+      if (!files || files.length === 0) {
+        resolve({ canceled: true, filePaths: [] })
+        return
+      }
+      const filePaths = Array.from(files).map(f => f.name)
+      resolve({ canceled: false, filePaths })
+    }
+    input.oncancel = () => {
+      resolve({ canceled: true, filePaths: [] })
+    }
+    input.click()
+  })
+}
+
+function readFile(filePath: string): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const input = createInputElement('')
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) {
+        reject(new Error('No file selected'))
+        return
+      }
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as ArrayBuffer)
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.readAsArrayBuffer(file)
+    }
+    input.click()
+  })
+}
+
 export async function captureScreen(): Promise<ScreenCaptureResult> {
   try {
     const sources = await (window as any).electronAPI?.getDesktopSources?.()
@@ -63,17 +115,38 @@ export async function captureScreen(): Promise<ScreenCaptureResult> {
 
 export async function selectImageFile(): Promise<ImageFileResult> {
   try {
-    const result = await (window as any).electronAPI?.openFileDialog?.({
-      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'tiff', 'tif'] }],
-      properties: ['openFile']
-    })
+    let fileData: ArrayBuffer | null = null
+    let fileName = 'image'
 
-    if (result?.canceled || !result?.filePaths?.[0]) {
-      return { success: false, error: 'No file selected' }
+    if (electronAPI?.openFileDialog) {
+      const result = await electronAPI.openFileDialog({
+        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'tiff', 'tif'] }],
+        properties: ['openFile']
+      })
+
+      if (result?.canceled || !result?.filePaths?.[0]) {
+        return { success: false, error: 'No file selected' }
+      }
+
+      const filePath = result.filePaths[0]
+      fileData = await electronAPI.readFile(filePath)
+      fileName = filePath.split(/[\\/]/).pop() || 'image'
+    } else {
+      const input = createInputElement('image/*')
+      const file: File | null = await new Promise((resolve) => {
+        input.onchange = () => resolve(input.files?.[0] || null)
+        input.oncancel = () => resolve(null)
+        input.click()
+      })
+      document.body.removeChild(input)
+
+      if (!file) {
+        return { success: false, error: 'No file selected' }
+      }
+
+      fileData = await file.arrayBuffer()
+      fileName = file.name
     }
-
-    const filePath = result.filePaths[0]
-    const fileData = await (window as any).electronAPI?.readFile?.(filePath)
     
     if (!fileData) {
       return { success: false, error: 'Failed to read file' }
@@ -87,7 +160,6 @@ export async function selectImageFile(): Promise<ImageFileResult> {
     }
 
     const base64 = await blobToBase64(blob)
-    const fileName = filePath.split(/[\\/]/).pop() || 'image'
 
     return {
       success: true,

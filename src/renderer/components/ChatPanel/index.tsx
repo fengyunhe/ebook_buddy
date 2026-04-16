@@ -18,10 +18,10 @@ import {
   ImageList,
   ImageListItem
 } from '@mui/material'
-import { Send as SendIcon, Settings as SettingsIcon, Image as ImageIcon, Close as CloseIcon } from '@mui/icons-material'
+import { Send as SendIcon, Settings as SettingsIcon, Image as ImageIcon, Close as CloseIcon, Delete as DeleteIcon } from '@mui/icons-material'
 
 export function ChatPanel() {
-  const { messages, isLoading, addMessage, setLoading } = useChatStore()
+  const { messages, isLoading, addMessage, setLoading, clearMessages } = useChatStore()
   const { transcriptionResult, error, reset: resetVoice } = useVoiceStore()
   const { baseUrl, model, timeout, apiKey, chatModel } = useConfigStore()
   const [input, setInput] = useState('')
@@ -152,9 +152,14 @@ export function ChatPanel() {
         <Typography variant="h6" sx={{ fontWeight: 600 }}>
           AI 助手
         </Typography>
-        <IconButton size="small" onClick={() => setSettingsOpen(true)} title="语音设置">
-          <SettingsIcon />
-        </IconButton>
+        <Box>
+          <IconButton size="small" onClick={clearMessages} title="清空聊天记录" disabled={messages.length === 0}>
+            <DeleteIcon />
+          </IconButton>
+          <IconButton size="small" onClick={() => setSettingsOpen(true)} title="语音设置">
+            <SettingsIcon />
+          </IconButton>
+        </Box>
       </Box>
       
       <VoiceSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />

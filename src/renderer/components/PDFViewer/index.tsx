@@ -91,31 +91,39 @@ export function PDFViewer({ onPageChange }: PDFViewerProps) {
     }
   }
 
-  const loadPDF = async (filePath: string, preservePage = false) => {
+  const loadPDF = async (filePathOrUrl: string, preservePage = false) => {
     try {
       setLoading(true)
       setError(null)
       
-      const fileData = await window.electronAPI.readFile(filePath)
+      let fileData: ArrayBuffer
+      if (window.electronAPI?.readFile) {
+        fileData = await window.electronAPI.readFile(filePathOrUrl)
+      } else {
+        // Browser: filePathOrUrl is actually a blob URL
+        const response = await fetch(filePathOrUrl)
+        fileData = await response.arrayBuffer()
+      }
+      
       const loadingTask = pdfjsLib.getDocument({ data: fileData })
       const pdf = await loadingTask.promise
       
       setPdfDoc(pdf)
       setTotalPages(pdf.numPages)
-      setCurrentFilePath(filePath)
+      setCurrentFilePath(filePathOrUrl)
       
       if (preservePage) {
         const saved = loadSavedState()
-        const page = saved?.filePath === filePath ? saved.page : 1
-        const scaleValue = saved?.filePath === filePath ? saved.scale : scale
+        const page = saved?.filePath === filePathOrUrl ? saved.page : 1
+        const scaleValue = saved?.filePath === filePathOrUrl ? saved.scale : scale
         setCurrentPage(page)
         setPageInput(String(page))
         setScale(scaleValue)
-        saveState(filePath, page, scaleValue)
+        saveState(filePathOrUrl, page, scaleValue)
       } else {
         setCurrentPage(1)
         setPageInput('1')
-        saveState(filePath, 1, scale)
+        saveState(filePathOrUrl, 1, scale)
       }
     } catch (err) {
       setError('Failed to load PDF')
@@ -134,9 +142,24 @@ export function PDFViewer({ onPageChange }: PDFViewerProps) {
 
   const handleOpenFile = async () => {
     try {
-      const result = await window.electronAPI.openFileDialog()
-      if (!result.canceled && result.filePaths.length > 0) {
-        await loadPDF(result.filePaths[0])
+      if (window.electronAPI?.openFileDialog) {
+        const result = await window.electronAPI.openFileDialog()
+        if (!result.canceled && result.filePaths.length > 0) {
+          await loadPDF(result.filePaths[0])
+        }
+      } else {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = '.pdf'
+        input.onchange = async () => {
+          const file = input.files?.[0]
+          if (file) {
+            const arrayBuffer = await file.arrayBuffer()
+            // For browser, we need to use FileReader or pass ArrayBuffer directly
+            loadPDF(URL.createObjectURL(new Blob([arrayBuffer], { type: 'application/pdf' })))
+          }
+        }
+        input.click()
       }
     } catch (err) {
       setError('Failed to open file dialog')

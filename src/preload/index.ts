@@ -6,5 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readFile: (filePath: string) => ipcRenderer.invoke('file:read', filePath),
   getDesktopSources: () => ipcRenderer.invoke('desktop:getSources'),
   captureRegion: (sourceId: string, region: { x: number; y: number; width: number; height: number }) => 
-    ipcRenderer.invoke('desktop:captureRegion', sourceId, region)
+    ipcRenderer.invoke('desktop:captureRegion', sourceId, region),
+  apiFetch: (options: { url: string; method: string; headers?: Record<string, string>; body?: string }) => 
+    ipcRenderer.invoke('api:fetch', options)
 })
