@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useChatStore } from '../../stores/chatStore'
 import { useVoiceStore } from '../../stores/voiceStore'
+import { useConfigStore } from '../../stores/configStore'
+import { sendChatMessage } from '../../services/chatService'
 import { MarkdownRenderer } from '../MarkdownRenderer'
 import { VoiceSettingsDialog } from '../VoiceSettingsDialog'
 import {
@@ -15,8 +17,9 @@ import {
 import { Send as SendIcon, Settings as SettingsIcon } from '@mui/icons-material'
 
 export function ChatPanel() {
-  const { messages, isLoading, addMessage } = useChatStore()
+  const { messages, isLoading, addMessage, setLoading } = useChatStore()
   const { transcriptionResult, error, reset: resetVoice } = useVoiceStore()
+  const { baseUrl, model, timeout } = useConfigStore()
   const [input, setInput] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -45,14 +48,50 @@ export function ChatPanel() {
     addMessage({
       role: 'user',
       content: userMessage,
-      contentType: 'text'
+      contentType: 'text',
+      status: 'sent'
     })
 
-    addMessage({
-      role: 'assistant',
-      content: '这是一个模拟的AI回复。在实际实现中，这里将连接到AI服务API。\n\n您可以在这里测试Markdown渲染：\n\n- **粗体文本**\n- *斜体文本*\n- `代码`\n\n数学公式: $E = mc^2$\n\n$$\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$\n\n```javascript\nconsole.log("Hello World");\n```',
-      contentType: 'markdown'
-    })
+    setLoading(true)
+    
+    try {
+      const history = messages
+        .filter(m => m.status === 'sent')
+        .map(m => ({ role: m.role, content: m.content }))
+      
+      const result = await sendChatMessage(
+        userMessage,
+        { baseUrl, model, timeout, temperature: 0.7, maxTokens: 2048 },
+        history
+      )
+
+      if (result.success) {
+        addMessage({
+          role: 'assistant',
+          content: result.content,
+          contentType: 'markdown',
+          status: 'sent'
+        })
+      } else {
+        addMessage({
+          role: 'assistant',
+          content: `错误: ${result.error}`,
+          contentType: 'text',
+          status: 'error',
+          errorMessage: result.error
+        })
+      }
+    } catch (err) {
+      addMessage({
+        role: 'assistant',
+        content: `请求失败: ${err instanceof Error ? err.message : '未知错误'}`,
+        contentType: 'text',
+        status: 'error',
+        errorMessage: err instanceof Error ? err.message : '未知错误'
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
