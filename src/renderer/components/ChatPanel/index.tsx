@@ -2,7 +2,9 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useChatStore } from '../../stores/chatStore'
 import { useVoiceStore } from '../../stores/voiceStore'
 import { useConfigStore } from '../../stores/configStore'
-import { sendChatMessage } from '../../services/chatService'
+import { sendChatMessage, sendChatMessageWithImage } from '../../services/chatService'
+import { captureScreen, selectImageFile } from '../../services/mediaService'
+import type { MediaAttachment } from '../../../shared/types/media'
 import { MarkdownRenderer } from '../MarkdownRenderer'
 import { VoiceSettingsDialog } from '../VoiceSettingsDialog'
 import {
@@ -12,15 +14,18 @@ import {
   Button,
   Paper,
   CircularProgress,
-  IconButton
+  IconButton,
+  ImageList,
+  ImageListItem
 } from '@mui/material'
-import { Send as SendIcon, Settings as SettingsIcon } from '@mui/icons-material'
+import { Send as SendIcon, Settings as SettingsIcon, ScreenshotMonitor, Image as ImageIcon, Close as CloseIcon } from '@mui/icons-material'
 
 export function ChatPanel() {
   const { messages, isLoading, addMessage, setLoading } = useChatStore()
   const { transcriptionResult, error, reset: resetVoice } = useVoiceStore()
   const { baseUrl, model, timeout } = useConfigStore()
   const [input, setInput] = useState('')
+  const [attachments, setAttachments] = useState<MediaAttachment[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   
@@ -40,10 +45,11 @@ export function ChatPanel() {
   }, [error, resetVoice])
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+    if ((!input.trim() && attachments.length === 0) || isLoading) return
 
     const userMessage = input.trim()
     setInput('')
+    setAttachments([])
 
     addMessage({
       role: 'user',
@@ -59,11 +65,22 @@ export function ChatPanel() {
         .filter(m => m.status === 'sent')
         .map(m => ({ role: m.role, content: m.content }))
       
-      const result = await sendChatMessage(
-        userMessage,
-        { baseUrl, model, timeout, temperature: 0.7, maxTokens: 2048 },
-        history
-      )
+      let result
+      if (attachments.length > 0) {
+        const imageBase64 = attachments[0].data
+        result = await sendChatMessageWithImage(
+          userMessage,
+          imageBase64,
+          { baseUrl, model, timeout, temperature: 0.7, maxTokens: 2048 },
+          history
+        )
+      } else {
+        result = await sendChatMessage(
+          userMessage,
+          { baseUrl, model, timeout, temperature: 0.7, maxTokens: 2048 },
+          history
+        )
+      }
 
       if (result.success) {
         addMessage({
@@ -99,6 +116,24 @@ export function ChatPanel() {
       e.preventDefault()
       handleSend()
     }
+  }
+
+  const handleCaptureScreen = async () => {
+    const result = await captureScreen()
+    if (result.success && result.data) {
+      setAttachments(prev => [...prev, result.data!])
+    }
+  }
+
+  const handleSelectImage = async () => {
+    const result = await selectImageFile()
+    if (result.success && result.data) {
+      setAttachments(prev => [...prev, result.data!])
+    }
+  }
+
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id))
   }
 
   return (
@@ -188,15 +223,63 @@ export function ChatPanel() {
           disabled={isLoading}
           size="small"
         />
-        <Button
-          variant="contained"
-          onClick={handleSend}
-          disabled={!input.trim() || isLoading}
-          sx={{ minWidth: 80 }}
-        >
-          {isLoading ? <CircularProgress size={20} /> : <SendIcon />}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <IconButton 
+            size="small" 
+            onClick={handleCaptureScreen} 
+            disabled={isLoading}
+            title="截取屏幕"
+          >
+            <ScreenshotMonitor />
+          </IconButton>
+          <IconButton 
+            size="small" 
+            onClick={handleSelectImage} 
+            disabled={isLoading}
+            title="选择图片"
+          >
+            <ImageIcon />
+          </IconButton>
+          <Button
+            variant="contained"
+            onClick={handleSend}
+            disabled={(!input.trim() && attachments.length === 0) || isLoading}
+            sx={{ minWidth: 80 }}
+          >
+            {isLoading ? <CircularProgress size={20} /> : <SendIcon />}
+          </Button>
+        </Box>
       </Box>
+      {attachments.length > 0 && (
+        <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider' }}>
+          <ImageList cols={4} gap={4} sx={{ m: 0 }}>
+            {attachments.map((attachment) => (
+              <ImageListItem key={attachment.id} sx={{ position: 'relative' }}>
+                <img
+                  src={`data:${attachment.mimeType};base64,${attachment.data}`}
+                  alt={attachment.name || 'attachment'}
+                  loading="lazy"
+                  style={{ height: 60, objectFit: 'cover', borderRadius: 4 }}
+                />
+                <IconButton
+                  size="small"
+                  onClick={() => handleRemoveAttachment(attachment.id)}
+                  sx={{
+                    position: 'absolute',
+                    top: 2,
+                    right: 2,
+                    bgcolor: 'rgba(0,0,0,0.5)',
+                    '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                    padding: 0.25
+                  }}
+                >
+                  <CloseIcon fontSize="small" sx={{ color: 'white', fontSize: 14 }} />
+                </IconButton>
+              </ImageListItem>
+            ))}
+          </ImageList>
+        </Box>
+      )}
     </Box>
   )
 }
