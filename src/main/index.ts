@@ -65,3 +65,25 @@ ipcMain.handle('desktop:getSources', async () => {
     thumbnail: source.thumbnail.toDataURL()
   }))
 })
+
+ipcMain.handle('desktop:captureRegion', async (_event, sourceId: string, region: { x: number; y: number; width: number; height: number }) => {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen', 'window'],
+      thumbnailSize: { width: 1920, height: 1080 }
+    })
+    
+    const source = sources.find(s => s.id === sourceId)
+    if (!source) {
+      throw new Error('Source not found')
+    }
+
+    const thumbnail = source.thumbnail
+    const cropImage = thumbnail.crop(region)
+    const dataUrl = cropImage.toDataURL()
+    
+    return { success: true, data: dataUrl.split(',')[1], mimeType: 'image/png' }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to capture region' }
+  }
+})

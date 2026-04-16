@@ -3,10 +3,11 @@ import { useChatStore } from '../../stores/chatStore'
 import { useVoiceStore } from '../../stores/voiceStore'
 import { useConfigStore } from '../../stores/configStore'
 import { sendChatMessage, sendChatMessageWithImage } from '../../services/chatService'
-import { captureScreen, selectImageFile } from '../../services/mediaService'
+import { selectImageFile } from '../../services/mediaService'
 import type { MediaAttachment } from '../../../shared/types/media'
 import { MarkdownRenderer } from '../MarkdownRenderer'
 import { VoiceSettingsDialog } from '../VoiceSettingsDialog'
+import { RegionSelector } from '../RegionSelector'
 import {
   Box,
   Typography,
@@ -26,6 +27,7 @@ export function ChatPanel() {
   const { baseUrl, model, timeout } = useConfigStore()
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<MediaAttachment[]>([])
+  const [showRegionSelector, setShowRegionSelector] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   
@@ -118,11 +120,26 @@ export function ChatPanel() {
     }
   }
 
-  const handleCaptureScreen = async () => {
-    const result = await captureScreen()
-    if (result.success && result.data) {
-      setAttachments(prev => [...prev, result.data!])
+  const handleCaptureScreen = () => {
+    setShowRegionSelector(true)
+  }
+
+  const handleRegionCapture = async (region: { x: number; y: number; width: number; height: number }) => {
+    try {
+      const result = await (window as any).electronAPI?.captureRegion?.('screen:0', region)
+      if (result?.success) {
+        setAttachments(prev => [...prev, {
+          id: crypto.randomUUID(),
+          type: 'image',
+          data: result.data,
+          mimeType: result.mimeType || 'image/png',
+          size: Math.ceil(result.data.length * 0.75)
+        }])
+      }
+    } catch (err) {
+      console.error('Failed to capture region:', err)
     }
+    setShowRegionSelector(false)
   }
 
   const handleSelectImage = async () => {
@@ -228,7 +245,7 @@ export function ChatPanel() {
             size="small" 
             onClick={handleCaptureScreen} 
             disabled={isLoading}
-            title="截取屏幕"
+            title="截取屏幕区域"
           >
             <ScreenshotMonitor />
           </IconButton>
@@ -279,6 +296,12 @@ export function ChatPanel() {
             ))}
           </ImageList>
         </Box>
+      )}
+      {showRegionSelector && (
+        <RegionSelector 
+          onCapture={handleRegionCapture} 
+          onClose={() => setShowRegionSelector(false)} 
+        />
       )}
     </Box>
   )
