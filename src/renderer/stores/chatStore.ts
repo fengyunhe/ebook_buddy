@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
-import type { ChatMessage } from '../../../shared/types'
+import type { ChatMessage } from '../../shared/types'
 
 interface ChatState {
   messages: ChatMessage[]

@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useChatStore } from '../../stores/chatStore'
 import { useVoiceStore } from '../../stores/voiceStore'
+import { useConfigStore } from '../../stores/configStore'
+import { sendChatMessage, sendChatMessageWithImage } from '../../services/chatService'
+import { selectImageFile, processClipboardImage } from '../../services/mediaService'
+import type { MediaAttachment } from '../../../shared/types/media'
 import { MarkdownRenderer } from '../MarkdownRenderer'
 import { VoiceSettingsDialog } from '../VoiceSettingsDialog'
 import {
@@ -10,14 +14,18 @@ import {
   Button,
   Paper,
   CircularProgress,
-  IconButton
+  IconButton,
+  ImageList,
+  ImageListItem
 } from '@mui/material'
-import { Send as SendIcon, Settings as SettingsIcon } from '@mui/icons-material'
+import { Send as SendIcon, Settings as SettingsIcon, Image as ImageIcon, Close as CloseIcon } from '@mui/icons-material'
 
 export function ChatPanel() {
-  const { messages, isLoading, addMessage } = useChatStore()
+  const { messages, isLoading, addMessage, setLoading } = useChatStore()
   const { transcriptionResult, error, reset: resetVoice } = useVoiceStore()
+  const { baseUrl, model, timeout } = useConfigStore()
   const [input, setInput] = useState('')
+  const [attachments, setAttachments] = useState<MediaAttachment[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   
@@ -36,23 +44,79 @@ export function ChatPanel() {
     }
   }, [error, resetVoice])
 
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const clipboardImage = await processClipboardImage()
+    if (clipboardImage.success && clipboardImage.data) {
+      e.preventDefault()
+      setAttachments(prev => [...prev, clipboardImage.data!])
+    }
+  }
+
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+    if ((!input.trim() && attachments.length === 0) || isLoading) return
 
     const userMessage = input.trim()
     setInput('')
+    setAttachments([])
 
     addMessage({
       role: 'user',
       content: userMessage,
-      contentType: 'text'
+      contentType: 'text',
+      status: 'sent'
     })
 
-    addMessage({
-      role: 'assistant',
-      content: '这是一个模拟的AI回复。在实际实现中，这里将连接到AI服务API。\n\n您可以在这里测试Markdown渲染：\n\n- **粗体文本**\n- *斜体文本*\n- `代码`\n\n数学公式: $E = mc^2$\n\n$$\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$\n\n```javascript\nconsole.log("Hello World");\n```',
-      contentType: 'markdown'
-    })
+    setLoading(true)
+    
+    try {
+      const history = messages
+        .filter(m => m.status === 'sent')
+        .map(m => ({ role: m.role, content: m.content }))
+      
+      let result
+      if (attachments.length > 0) {
+        const imageBase64 = attachments[0].data
+        result = await sendChatMessageWithImage(
+          userMessage,
+          imageBase64,
+          { baseUrl, model, timeout, temperature: 0.7, maxTokens: 2048 },
+          history
+        )
+      } else {
+        result = await sendChatMessage(
+          userMessage,
+          { baseUrl, model, timeout, temperature: 0.7, maxTokens: 2048 },
+          history
+        )
+      }
+
+      if (result.success) {
+        addMessage({
+          role: 'assistant',
+          content: result.content,
+          contentType: 'markdown',
+          status: 'sent'
+        })
+      } else {
+        addMessage({
+          role: 'assistant',
+          content: `错误: ${result.error}`,
+          contentType: 'text',
+          status: 'error',
+          errorMessage: result.error
+        })
+      }
+    } catch (err) {
+      addMessage({
+        role: 'assistant',
+        content: `请求失败: ${err instanceof Error ? err.message : '未知错误'}`,
+        contentType: 'text',
+        status: 'error',
+        errorMessage: err instanceof Error ? err.message : '未知错误'
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -60,6 +124,17 @@ export function ChatPanel() {
       e.preventDefault()
       handleSend()
     }
+  }
+
+  const handleSelectImage = async () => {
+    const result = await selectImageFile()
+    if (result.success && result.data) {
+      setAttachments(prev => [...prev, result.data!])
+    }
+  }
+
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id))
   }
 
   return (
@@ -145,19 +220,60 @@ export function ChatPanel() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="输入消息..."
+          onPaste={handlePaste}
+          placeholder="输入消息... (Ctrl+V粘贴图片)"
           disabled={isLoading}
           size="small"
         />
-        <Button
-          variant="contained"
-          onClick={handleSend}
-          disabled={!input.trim() || isLoading}
-          sx={{ minWidth: 80 }}
-        >
-          {isLoading ? <CircularProgress size={20} /> : <SendIcon />}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <IconButton 
+            size="small" 
+            onClick={handleSelectImage} 
+            disabled={isLoading}
+            title="选择图片"
+          >
+            <ImageIcon />
+          </IconButton>
+          <Button
+            variant="contained"
+            onClick={handleSend}
+            disabled={(!input.trim() && attachments.length === 0) || isLoading}
+            sx={{ minWidth: 80 }}
+          >
+            {isLoading ? <CircularProgress size={20} /> : <SendIcon />}
+          </Button>
+        </Box>
       </Box>
+      {attachments.length > 0 && (
+        <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider' }}>
+          <ImageList cols={4} gap={4} sx={{ m: 0 }}>
+            {attachments.map((attachment) => (
+              <ImageListItem key={attachment.id} sx={{ position: 'relative' }}>
+                <img
+                  src={`data:${attachment.mimeType};base64,${attachment.data}`}
+                  alt={attachment.name || 'attachment'}
+                  loading="lazy"
+                  style={{ height: 60, objectFit: 'cover', borderRadius: 4 }}
+                />
+                <IconButton
+                  size="small"
+                  onClick={() => handleRemoveAttachment(attachment.id)}
+                  sx={{
+                    position: 'absolute',
+                    top: 2,
+                    right: 2,
+                    bgcolor: 'rgba(0,0,0,0.5)',
+                    '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                    padding: 0.25
+                  }}
+                >
+                  <CloseIcon fontSize="small" sx={{ color: 'white', fontSize: 14 }} />
+                </IconButton>
+              </ImageListItem>
+            ))}
+          </ImageList>
+        </Box>
+      )}
     </Box>
   )
 }
