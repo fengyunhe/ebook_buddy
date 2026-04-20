@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { MainLayout } from './components/Layout'
 import { PDFViewer } from './components/PDFViewer'
 import { ChatPanel } from './components/ChatPanel'
+import { KnowledgePanel } from './components/KnowledgePanel'
 import { VoiceRecordingIndicator } from './components/VoiceRecordingIndicator'
 import { useVoiceRecorder } from './services/useVoiceRecorder'
 import { useVoiceStore } from './stores/voiceStore'
@@ -21,6 +22,7 @@ function App() {
     <>
       <MainLayout
         leftPanel={<PDFViewer />}
+        middlePanel={<KnowledgePanel />}
         rightPanel={<ChatPanel />}
       />
       <VoiceRecordingIndicator />

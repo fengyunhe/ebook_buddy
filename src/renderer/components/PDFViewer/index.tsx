@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { useConfigStore } from '../../stores/configStore'
 import * as pdfjsLib from 'pdfjs-dist'
 import {
   Box,
@@ -19,6 +20,13 @@ import {
   ZoomOut as ZoomOutIcon
 } from '@mui/icons-material'
 import { useConversationImageStore } from '../../stores/conversationImageStore'
+import { useKnowledgeStore } from '../../stores/knowledgeStore'
+import { hasTextLayer, extractText, extractViaOcr } from '../../services/pdfAnalyzer'
+import { saveCachedAnalysis } from '../../services/pdfCache'
+import { QdrantService } from '../../services/qdrantService'
+import { embedText, embedChunks, getDeviceType, getAvailableEmbedAccelerations } from '../../services/embeddingService'
+import { getAvailableAccelerations, isAppleSilicon } from '../../services/ocrEngine'
+
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -58,6 +66,14 @@ export function PDFViewer({ onPageChange }: PDFViewerProps) {
   const [notification, setNotification] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'info' })
   
   const addImage = useConversationImageStore((state) => state.addImage)
+  const knowledgeStorePage = useKnowledgeStore((state) => state.currentPage)
+  const { setPdfInfo, startAnalysis, _updateAnalysisProgress, _addBlocks, _clearBlocks, _markAnalysisComplete, setCurrentPage: setKnowledgePage } = useKnowledgeStore()
+
+  useEffect(() => {
+    if (knowledgeStorePage && knowledgeStorePage !== currentPage) {
+      setCurrentPage(knowledgeStorePage)
+    }
+  }, [knowledgeStorePage])
   
   useEffect(() => {
     filePathRef.current = currentFilePath
@@ -224,6 +240,83 @@ export function PDFViewer({ onPageChange }: PDFViewerProps) {
     }
   }
 
+  const runAnalysisPipeline = async (pdfDoc: pdfjsLib.PDFDocumentProxy, filePath: string) => {
+    const qdrantService = new QdrantService()
+    await qdrantService.ensureCollection()
+
+    const [ocrAccel, deviceType] = await Promise.all([
+      getAvailableAccelerations(),
+      getDeviceType()
+    ])
+    
+    const isM = await isAppleSilicon()
+    console.log('[Analysis] Device:', deviceType, isM ? '(Apple M-Series)' : '')
+    console.log('[Analysis] OCR Accel:', ocrAccel.map(a => a.type).join(', '))
+
+    const hasText = await hasTextLayer(pdfDoc)
+    const totalPages = pdfDoc.numPages
+    _clearBlocks()
+    _updateAnalysisProgress({ totalBlocks: totalPages })
+    let allBlocks: any[] = []
+
+    if (hasText) {
+      allBlocks = await extractText(pdfDoc, (pageNum) => {
+        _updateAnalysisProgress({ currentBlock: pageNum, totalBlocks: totalPages })
+      })
+    } else {
+      const isAppleChip = await isAppleSilicon()
+      const result = await extractViaOcr(pdfDoc, (pageNum, total) => {
+        _updateAnalysisProgress({ currentBlock: pageNum, totalBlocks: total || totalPages })
+      }, {
+        gpuEnabled: isAppleChip
+      })
+      allBlocks = [...result.blocks, ...result.figures]
+    }
+
+    const { embeddingBaseUrl, embeddingModel, embeddingApiKey } = useConfigStore.getState()
+    const config = {
+      baseUrl: embeddingBaseUrl || ((window as any).electronAPI?.apiFetch ? 'http://localhost:11434/v1' : ''),
+      model: embeddingModel || 'nomic-embed-text',
+      apiKey: embeddingApiKey || ''
+    }
+
+    const texts = allBlocks.map(b => b.text)
+    const embeddings = await embedChunks(texts, config, (i, total) => {
+      _updateAnalysisProgress({ currentBlock: totalPages + i, totalBlocks: totalPages + total })
+    })
+
+    const qdrantEntries = allBlocks.map((block, i) => ({
+      pointId: i + 1,
+      payload: {
+        pdf_id: filePath,
+        pdf_path: filePath,
+        page_number: block.pageNumber,
+        block_type: block.type,
+        block_index: i,
+        text: block.text,
+        word_count: block.wordCount
+      },
+      vector: { text: embeddings.get(i)?.vector || [] }
+    }))
+
+    await qdrantService.upsertEntries(filePath, qdrantEntries)
+
+    const cacheBlocks = allBlocks.map(b => ({ ...b, textVector: undefined, imageVector: undefined }))
+    await saveCachedAnalysis({
+      pdfPath: filePath,
+      fileHash: filePath,
+      fileMtime: Date.now(),
+      totalPages: pdfDoc.numPages,
+      blocks: cacheBlocks,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    })
+
+    _addBlocks(allBlocks)
+    _markAnalysisComplete(allBlocks.length)
+    _updateAnalysisProgress({ estimatedRemainingMs: null })
+  }
+
   const loadPDF = async (filePathOrUrl: string, preservePage = false) => {
     try {
       setLoading(true)
@@ -244,6 +337,11 @@ export function PDFViewer({ onPageChange }: PDFViewerProps) {
       setPdfDoc(pdf)
       setTotalPages(pdf.numPages)
       setCurrentFilePath(filePathOrUrl)
+      
+      // Trigger knowledge analysis
+      setPdfInfo(filePathOrUrl, pdf.numPages)
+      startAnalysis()
+      runAnalysisPipeline(pdf, filePathOrUrl)
       
       if (preservePage) {
         const saved = loadSavedState()
@@ -288,7 +386,6 @@ export function PDFViewer({ onPageChange }: PDFViewerProps) {
           const file = input.files?.[0]
           if (file) {
             const arrayBuffer = await file.arrayBuffer()
-            // For browser, we need to use FileReader or pass ArrayBuffer directly
             loadPDF(URL.createObjectURL(new Blob([arrayBuffer], { type: 'application/pdf' })))
           }
         }
@@ -343,6 +440,7 @@ export function PDFViewer({ onPageChange }: PDFViewerProps) {
     if (currentPage > 1) {
       const newPage = currentPage - 1
       setCurrentPage(newPage)
+      setKnowledgePage(newPage)
       setPageInput(String(newPage))
       onPageChange?.(newPage)
       if (currentFilePath) {
@@ -355,6 +453,7 @@ export function PDFViewer({ onPageChange }: PDFViewerProps) {
     if (currentPage < totalPages) {
       const newPage = currentPage + 1
       setCurrentPage(newPage)
+      setKnowledgePage(newPage)
       setPageInput(String(newPage))
       onPageChange?.(newPage)
       if (currentFilePath) {
@@ -398,6 +497,7 @@ const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const page = parseInt(pageInput, 10)
     if (!isNaN(page) && page >= 1 && page <= totalPages) {
       setCurrentPage(page)
+      setKnowledgePage(page)
       onPageChange?.(page)
       if (currentFilePath) {
         saveState(currentFilePath, page, scale)
@@ -510,7 +610,9 @@ const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
           overflow: 'auto',
           p: 2.5,
           bgcolor: '#f5f5f5',
-          minWidth: 'min-content'
+          minWidth: 'min-content',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' }
         }}
       >
         {loading && (
@@ -537,7 +639,8 @@ const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         <Box 
           sx={{ 
             display: 'flex',
-            justifyContent: canvasWidth > containerWidth && containerWidth > 0 ? 'flex-start' : 'center'
+            justifyContent: canvasWidth > containerWidth && containerWidth > 0 ? 'flex-start' : 'center',
+            position: 'relative'
           }}
         >
           <canvas ref={canvasRef} style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} />
