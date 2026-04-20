@@ -11,6 +11,9 @@ Auto-generated from all feature plans. Last updated: 2026-04-16
 
 - TypeScript 5.3 + Electron 28, React 18, Zustand (002-alt-voice-input)
 
+- TypeScript 5.3 + Electron 28, React 18, Zustand, pdfjs-dist, tesseract.js, qdrant-client, idb, @xenova/transformers (006-research-assistant)
+- IndexedDB (缓存), Qdrant (向量索引), OCR (Tesseract.js / Umi-OCR) (006-research-assistant)
+
 ## Project Structure
 
 ```text
@@ -27,6 +30,7 @@ npm test && npm run lint
 TypeScript 5.3: Follow standard conventions
 
 ## Recent Changes
+- 006-research-assistant: Added PDF auto-analysis engine, OCR (Tesseract.js/Umi-OCR), embedding service, Qdrant integration, knowledge store, analysis progress indicator
 - 005-page-image-chat: Added TypeScript 5.3 + Electron 28, React 18, Zustand, PDF.js (pdfjs-dist)
 - 004-ai-settings-api-key: Added TypeScript 5.3 + Electron 28, React 18, Zustand, @mui/material, electron-store
 - 003-ai-chat-voice-image: Added TypeScript 5.3 + Electron 28, React 18, Zustand

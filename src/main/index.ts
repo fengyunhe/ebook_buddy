@@ -1,6 +1,10 @@
 import { app, BrowserWindow, ipcMain, dialog, desktopCapturer } from 'electron'
 import { join } from 'path'
-import { readFile } from 'fs/promises'
+import { readFile, stat } from 'fs/promises'
+
+app.commandLine.appendSwitch('enable-unsafe-webgpu')
+app.commandLine.appendSwitch('enable-features', 'WebGPU')
+app.commandLine.appendSwitch('ignore-gpu-blocklist')
 
 let mainWindow: BrowserWindow | null = null
 
@@ -12,7 +16,7 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      enableBlinkFeatures: 'DeviceEmulation'
+      enableBlinkFeatures: 'DeviceEmulation,WebGPU'
     }
   })
 
@@ -142,5 +146,14 @@ ipcMain.on('page-capture:get-remaining', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (win) {
     win.webContents.send('page-capture:remaining-reply', 0)
+  }
+})
+
+ipcMain.handle('file:stat', async (_event, filePath: string) => {
+  try {
+    const stats = await stat(filePath)
+    return { size: stats.size, mtime: stats.mtime.getTime(), error: null }
+  } catch (error) {
+    return { size: 0, mtime: 0, error: error instanceof Error ? error.message : 'Failed to stat file' }
   }
 })

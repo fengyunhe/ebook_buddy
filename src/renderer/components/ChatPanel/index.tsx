@@ -3,11 +3,12 @@ import { useChatStore } from '../../stores/chatStore'
 import { useVoiceStore } from '../../stores/voiceStore'
 import { useConfigStore } from '../../stores/configStore'
 import { useConversationImageStore } from '../../stores/conversationImageStore'
-import { sendChatMessage, sendChatMessageWithImage } from '../../services/chatService'
+import { useKnowledgeStore } from '../../stores/knowledgeStore'
+import { sendChatMessage, sendChatMessageWithImage, type Citation } from '../../services/chatService'
 import { selectMultipleImageFiles, processClipboardImage } from '../../services/mediaService'
 import type { MediaAttachment } from '../../../shared/types/media'
 import { MarkdownRenderer } from '../MarkdownRenderer'
-import { VoiceSettingsDialog } from '../VoiceSettingsDialog'
+import { SettingsDialog } from '../SettingsDialog'
 import {
   Box,
   Typography,
@@ -19,7 +20,7 @@ import {
   ImageList,
   ImageListItem
 } from '@mui/material'
-import { Send as SendIcon, Settings as SettingsIcon, Image as ImageIcon, Close as CloseIcon, Delete as DeleteIcon } from '@mui/icons-material'
+import { Send as SendIcon, Settings as SettingsIcon, Image as ImageIcon, Close as CloseIcon, Delete as DeleteIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-material'
 
 export function ChatPanel() {
   const { messages, isLoading, addMessage, setLoading, clearMessages } = useChatStore()
@@ -27,10 +28,16 @@ export function ChatPanel() {
   const { baseUrl, model, timeout, apiKey, chatModel } = useConfigStore()
   const pageImages = useConversationImageStore((state) => state.images)
   const removePageImage = useConversationImageStore((state) => state.removeImage)
+  const currentPdf = useKnowledgeStore((state) => state.currentPdfId)
+  const currentPage = useKnowledgeStore((state) => state.currentPage)
+  const analysisStatus = useKnowledgeStore((state) => state.analysisProgress.status)
+  const goToPage = useKnowledgeStore((state) => state.goToPage)
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<MediaAttachment[]>([])
+  const [citations, setCitations] = useState<Citation[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [lastCitations, setLastCitations] = useState<Citation[]>([])
   
   useEffect(() => {
     if (transcriptionResult?.success && transcriptionResult.text) {
@@ -80,6 +87,14 @@ export function ChatPanel() {
       let result
       const hasImages = attachments.length > 0 || pageImages.length > 0
       
+      const hasPdf = currentPdf && analysisStatus === 'completed'
+      const contextOptions = hasPdf ? {
+        pdfId: currentPdf,
+        currentPage,
+        pageContextPages: 2,
+        injectPageContext: true
+      } : undefined
+
       if (hasImages) {
         const allImages = [
           ...attachments.map(a => a.data),
@@ -89,13 +104,15 @@ export function ChatPanel() {
           userMessage,
           allImages,
           { baseUrl, model: chatModel, timeout, temperature: 0.7, maxTokens: 2048, apiKey },
-          history
+          history,
+          contextOptions
         )
       } else {
         result = await sendChatMessage(
           userMessage,
           { baseUrl, model: chatModel, timeout, temperature: 0.7, maxTokens: 2048, apiKey },
-          history
+          history,
+          contextOptions
         )
       }
 
@@ -106,6 +123,9 @@ export function ChatPanel() {
           contentType: 'markdown',
           status: 'sent'
         })
+        if (result.citations && result.citations.length > 0) {
+          setLastCitations(result.citations)
+        }
       } else {
         addMessage({
           role: 'assistant',
@@ -133,6 +153,10 @@ export function ChatPanel() {
       e.preventDefault()
       handleSend()
     }
+  }
+
+  const handleCitationClick = (pageNumber: number) => {
+    goToPage(pageNumber)
   }
 
   const handleSelectImage = async () => {
@@ -177,7 +201,7 @@ export function ChatPanel() {
         </Box>
       </Box>
       
-      <VoiceSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       
       <Box
         sx={{
