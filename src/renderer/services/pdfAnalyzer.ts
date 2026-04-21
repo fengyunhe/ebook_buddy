@@ -6,6 +6,7 @@ const PARALLEL_OCR_COUNT = 2
 
 const CHUNK_MAX_TOKENS = 500
 const CHUNK_MIN_TOKENS = 10
+const PAGE_MERGE_THRESHOLD = 2000
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.replace(/\s/g, '').length / 4)
@@ -74,21 +75,37 @@ export async function extractText(
       paragraphs.push(currentParagraph.trim())
     }
 
-    // Split paragraphs into chunks
-    for (let i = 0; i < paragraphs.length; i++) {
-      const paragraph = paragraphs[i]
-      const tokenCount = estimateTokens(paragraph)
+    const pageText = paragraphs.join(' ')
+    const pageTokens = estimateTokens(pageText)
+
+    if (pageTokens < PAGE_MERGE_THRESHOLD) {
       blocks.push({
-        id: `kb_${pdfId}_${pageNum}_${i}`,
+        id: `kb_${pdfId}_${pageNum}_0`,
         pdfId,
         pdfPath: '',
         pageNumber: pageNum,
         type: 'text',
-        text: paragraph,
-        wordCount: paragraph.split(/\s+/).length,
-        tokenEstimate: tokenCount,
+        text: pageText,
+        wordCount: pageText.split(/\s+/).length,
+        tokenEstimate: pageTokens,
         status: 'pending'
       })
+    } else {
+      for (let i = 0; i < paragraphs.length; i++) {
+        const paragraph = paragraphs[i]
+        const tokenCount = estimateTokens(paragraph)
+        blocks.push({
+          id: `kb_${pdfId}_${pageNum}_${i}`,
+          pdfId,
+          pdfPath: '',
+          pageNumber: pageNum,
+          type: 'text',
+          text: paragraph,
+          wordCount: paragraph.split(/\s+/).length,
+          tokenEstimate: tokenCount,
+          status: 'pending'
+        })
+      }
     }
 
     page.cleanup()
@@ -133,20 +150,37 @@ async function processPageOcr(
 
   if (ocrResult.text.trim()) {
     const paragraphs = ocrResult.text.split(/\n\s*\n/).filter(p => p.trim().length > 0)
-    for (const paragraph of paragraphs) {
-      const tokenCount = estimateTokens(paragraph)
-      if (tokenCount >= CHUNK_MIN_TOKENS) {
-        textBlocks.push({
-          id: `kb_${pdfId}_${pageNum}_${textBlocks.length}`,
-          pdfId,
-          pdfPath: '',
-          pageNumber: pageNum,
-          type: 'text',
-          text: paragraph.trim(),
-          wordCount: paragraph.trim().split(/\s+/).length,
-          tokenEstimate: tokenCount,
-          status: 'pending'
-        })
+    const pageText = paragraphs.join(' ')
+    const pageTokens = estimateTokens(pageText)
+
+    if (pageTokens < PAGE_MERGE_THRESHOLD) {
+      textBlocks.push({
+        id: `kb_${pdfId}_${pageNum}_0`,
+        pdfId,
+        pdfPath: '',
+        pageNumber: pageNum,
+        type: 'text',
+        text: pageText,
+        wordCount: pageText.split(/\s+/).length,
+        tokenEstimate: pageTokens,
+        status: 'pending'
+      })
+    } else {
+      for (const paragraph of paragraphs) {
+        const tokenCount = estimateTokens(paragraph)
+        if (tokenCount >= CHUNK_MIN_TOKENS) {
+          textBlocks.push({
+            id: `kb_${pdfId}_${pageNum}_${textBlocks.length}`,
+            pdfId,
+            pdfPath: '',
+            pageNumber: pageNum,
+            type: 'text',
+            text: paragraph.trim(),
+            wordCount: paragraph.trim().split(/\s+/).length,
+            tokenEstimate: tokenCount,
+            status: 'pending'
+          })
+        }
       }
     }
 
